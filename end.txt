@@ -1,0 +1,1515 @@
+index
+<?php
+session_start();
+$host = "localhost";
+$user = "root";
+$pass = "";
+$dbname = "my_database";
+
+$conn = new mysqli($host, $user, $pass, $dbname);
+
+if ($conn->connect_error) {
+    die("فشل الاتصال بقاعدة البيانات: " . $conn->connect_error);
+}
+
+if (isset($_POST['login'])) {
+    $code = $_POST['code'];
+    $password = $_POST['password'];
+
+    $sql = "SELECT * FROM users WHERE code='$code' AND password='$password'";
+    $result = $conn->query($sql);
+
+    if ($result->num_rows > 0) {
+        $user = $result->fetch_assoc();
+        $_SESSION['user_id'] = $user['id'];
+        $_SESSION['name'] = $user['name'];
+        $_SESSION['role'] = $user['role'];
+        $_SESSION['job'] = $user['job'];
+
+        if ($user['role'] == 'admin') {
+            header("Location: admin_dashboard.php");
+        } else {
+            header("Location: user_dashboard.php");
+        }
+        exit();
+    } else {
+        $error = "بيانات الدخول غير صحيحة!";
+    }
+}
+
+$conn->close();
+?>
+
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <title>تسجيل الدخول</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; margin-top: 100px; }
+        form { width: 300px; margin: auto; padding: 20px; border: 1px solid #ccc; border-radius: 5px; }
+        input { width: 100%; padding: 10px; margin: 10px 0; }
+        button { width: 100%; padding: 10px; background-color: #3498db; color: white; border: none; cursor: pointer; }
+        .error { color: red; }
+    </style>
+</head>
+<body>
+    <h2>تسجيل الدخول</h2>
+    <?php if (isset($error)) echo "<p class='error'>$error</p>"; ?>
+    <form method="POST">
+        <input type="text" name="code" placeholder="أدخل الكود" required>
+        <input type="password" name="password" placeholder="كلمة المرور" required>
+        <button type="submit" name="login">تسجيل الدخول</button>
+    </form>
+</body>
+</html>
+=================================================================================================================
+logout
+<?php
+session_start();
+session_destroy();
+header("Location: index.php");
+exit();
+?>
+=================================================================================================================
+admin_dashboard
+<?php
+session_start();
+$host = "localhost";
+$user = "root";
+$pass = "";
+$dbname = "my_database";
+$conn = new mysqli($host, $user, $pass, $dbname);
+
+if ($conn->connect_error) {
+    die("فشل الاتصال بقاعدة البيانات: " . $conn->connect_error);
+}
+
+$jobs = ['manager', 'captain', 'waiter', 'pass boy' , 'kitchen'];
+
+
+// إلبحث
+if (isset($_POST['search_code'])) {
+    $search_code = $_POST['search_code'];
+    $stmt = $conn->prepare("SELECT * FROM users WHERE code = ?");
+    $stmt->bind_param("s", $search_code);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    
+    while ($user = $result->fetch_assoc()) {
+        echo "<tr>
+                <td>{$user['id']}</td>
+                <td>{$user['name']}</td>
+                <td>{$user['code']}</td>
+                <td>{$user['role']}</td>
+                <td>" . ucfirst($user['job']) . "</td>
+                <td>
+                    <button class='btn btn-warning btn-sm' onclick=\"editUser({$user['id']}, '{$user['name']}', '{$user['code']}', '{$user['password']}', '{$user['role']}', '{$user['job']}')\">✏ تعديل</button>
+                    <a class='btn btn-danger btn-sm' href='?delete_user={$user['id']}' onclick=\"return confirm('هل أنت متأكد من الحذف؟')\">❌ حذف</a>
+                </td>
+            </tr>";
+    }
+    exit;
+}
+
+
+
+// إضافة أو تعديل مستخدم
+if (isset($_POST['add_user']) || isset($_POST['edit_user'])) {
+    $id = $_POST['id'] ?? null;
+    $name = trim($_POST['name']);
+    $code = trim($_POST['code']);
+    $password = $_POST['password']; 
+    $role = $_POST['role'];
+    $job = $_POST['job'];
+
+    if (isset($_POST['edit_user']) && $id) {
+        if (!empty($_POST['password'])) {
+            $password = $_POST['password'];
+            $stmt = $conn->prepare("UPDATE users SET name=?, code=?, password=?, role=?, job=? WHERE id=?");
+            $stmt->bind_param("sssssi", $name, $code, $password, $role, $job, $id);
+        } else {
+            $stmt = $conn->prepare("UPDATE users SET name=?, code=?, role=?, job=? WHERE id=?");
+            $stmt->bind_param("ssssi", $name, $code, $role, $job, $id);
+        }
+    } else {
+        $stmt = $conn->prepare("INSERT INTO users (name, code, password, role, job) VALUES (?, ?, ?, ?, ?)");
+        $stmt->bind_param("sssss", $name, $code, $password, $role, $job);
+    }
+    
+    $stmt->execute();
+
+    // إعادة التوجيه لمنع الإرسال المزدوج عند التحديث
+    header("Location: " . $_SERVER['PHP_SELF']);
+    exit;
+}
+
+// حذف مستخدم
+if (isset($_GET['delete_user'])) {
+    $id = $_GET['delete_user'];
+
+    // تنفيذ عملية الحذف
+    $stmt = $conn->prepare("DELETE FROM users WHERE id = ?");
+    $stmt->bind_param("i", $id);
+    $stmt->execute();
+
+    // إعادة التوجيه لتحديث الصفحة بعد الحذف
+    header("Location: " . $_SERVER['PHP_SELF']);
+    exit;
+}
+
+
+// إضافة ملف جديد أو تعديله
+if (isset($_POST['add_file']) || isset($_POST['edit_file'])) {
+    $file_name = trim($_POST['file_name']);
+    $job = $_POST['job'];
+    $file_id = $_POST['file_id'] ?? null;
+
+    if (isset($_POST['edit_file']) && $file_id) {
+        $stmt = $conn->prepare("UPDATE files SET file_name=?, allowed_job=? WHERE id=?");
+        $stmt->bind_param("ssi", $file_name, $job, $file_id);
+    } else {
+        $file = $_FILES['file'];
+        $allowed_extensions = ['pdf', 'jpg', 'png', 'mp4']; // أنواع الملفات المسموح بها
+        $file_extension = pathinfo($file['name'], PATHINFO_EXTENSION);
+
+        if (!in_array(strtolower($file_extension), $allowed_extensions)) {
+            die("❌ نوع الملف غير مسموح به!");
+        }
+
+        $upload_dir = "uploads/";
+        if (!is_dir($upload_dir)) {
+            mkdir($upload_dir, 0777, true);
+        }
+
+        $file_path = $upload_dir . uniqid() . "." . $file_extension;
+
+        if (move_uploaded_file($file['tmp_name'], $file_path)) {
+            $stmt = $conn->prepare("INSERT INTO files (file_name, file_path, allowed_job) VALUES (?, ?, ?)");
+            $stmt->bind_param("sss", $file_name, $file_path, $job);
+        }
+    }
+    $stmt->execute();
+
+    // إعادة التوجيه لمنع الإرسال المزدوج عند التحديث
+    header("Location: " . $_SERVER['PHP_SELF']);
+    exit;
+}
+
+// حذف ملف
+if (isset($_GET['delete_file'])) {
+    $id = $_GET['delete_file'];
+
+    // استعلام لجلب مسار الملف
+    $stmt = $conn->prepare("SELECT file_path FROM files WHERE id = ?");
+    $stmt->bind_param("i", $id);
+    $stmt->execute();
+    $result = $stmt->get_result();
+    $file = $result->fetch_assoc();
+
+    if ($file) {
+        $file_path = $file['file_path'];
+        
+        // حذف الملف الفعلي من السيرفر
+        if (file_exists($file_path)) {
+            unlink($file_path);
+        }
+
+        // حذف السجل من قاعدة البيانات
+        $stmt = $conn->prepare("DELETE FROM files WHERE id = ?");
+        $stmt->bind_param("i", $id);
+        $stmt->execute();
+    }
+
+    // إعادة التوجيه لمنع إعادة إرسال الطلب عند التحديث
+    header("Location: " . $_SERVER['PHP_SELF']);
+    exit;
+}
+
+
+
+// إضافة أو تعديل سؤال
+if (isset($_POST['save_question'])) {
+    $question = $_POST['question'];
+    $type = $_POST['type'];
+    $correct_answer = $_POST['correct_answer'];
+    $question_id = isset($_POST['question_id']) ? $_POST['question_id'] : null;
+
+    if ($question_id) {
+        $stmt = $conn->prepare("UPDATE questions SET question=?, type=?, correct_answer=? WHERE id=?");
+        $stmt->bind_param("sssi", $question, $type, $correct_answer, $question_id);
+        $stmt->execute();
+        $stmt->close();
+
+        if ($type == "multiple_choice") {
+            $stmt = $conn->prepare("DELETE FROM choices WHERE question_id=?");
+            $stmt->bind_param("i", $question_id);
+            $stmt->execute();
+            $stmt->close();
+
+            foreach ($_POST['choices'] as $index => $choice) {
+                $is_correct = ($index == $_POST['correct_choice']) ? 1 : 0;
+                $stmt = $conn->prepare("INSERT INTO choices (question_id, choice_text, is_correct) VALUES (?, ?, ?)");
+                $stmt->bind_param("isi", $question_id, $choice, $is_correct);
+                $stmt->execute();
+                $stmt->close();
+            }
+        }
+    } else {
+        $stmt = $conn->prepare("INSERT INTO questions (question, type, correct_answer) VALUES (?, ?, ?)");
+        $stmt->bind_param("sss", $question, $type, $correct_answer);
+        $stmt->execute();
+        $question_id = $stmt->insert_id;
+        $stmt->close();
+
+        if ($type == "multiple_choice") {
+            foreach ($_POST['choices'] as $index => $choice) {
+                $is_correct = ($index == $_POST['correct_choice']) ? 1 : 0;
+                $stmt = $conn->prepare("INSERT INTO choices (question_id, choice_text, is_correct) VALUES (?, ?, ?)");
+                $stmt->bind_param("isi", $question_id, $choice, $is_correct);
+                $stmt->execute();
+                $stmt->close();
+            }
+        }
+    }
+
+    // منع تكرار الإرسال عند إعادة تحميل الصفحة
+    header("Location: ".$_SERVER['PHP_SELF']);
+    exit();
+}
+// حذف سؤال
+if (isset($_POST['delete_question'])) {
+    $id = $_POST['question_id'];
+
+    // حذف الخيارات المرتبطة بالسؤال من جدول choices
+    $stmt = $conn->prepare("DELETE FROM choices WHERE question_id=?");
+    $stmt->bind_param("i", $id);
+    $stmt->execute();
+    $stmt->close();
+
+    // حذف السؤال نفسه من جدول questions
+    $stmt = $conn->prepare("DELETE FROM questions WHERE id=?");
+    $stmt->bind_param("i", $id);
+    $stmt->execute();
+    $stmt->close();
+    
+    // منع تكرار الإرسال عند إعادة تحميل الصفحة
+    header("Location: ".$_SERVER['PHP_SELF']);
+    exit();
+}
+
+$questions = $conn->query("SELECT * FROM questions");
+
+
+// جلب الوظائف المتاحة من users
+$roles_result = $conn->query("SELECT DISTINCT job FROM users");
+
+// جلب جميع الأسئلة المتاحة
+$questions_result = $conn->query("SELECT * FROM questions");
+
+// جلب جميع الامتحانات
+$exams_result = $conn->query("SELECT * FROM exams");
+
+// إضافة أو تعديل امتحان
+if ($_SERVER['REQUEST_METHOD'] == 'POST') {
+    $exam_id = $_POST['exam_id'] ?? null;
+    $exam_name = $_POST['exam_name'] ?? null;
+    $duration = $_POST['duration'] ?? null;
+    $allowed_roles = $_POST['allowed_roles'] ?? [];
+    $selected_questions = $_POST['selected_questions'] ?? [];
+
+    if ($exam_name && $duration && !empty($allowed_roles) && !empty($selected_questions)) {
+        $allowed_roles_str = implode(",", $allowed_roles);
+
+        if ($exam_id) {
+            // تعديل الامتحان
+            $stmt = $conn->prepare("UPDATE exams SET exam_name=?, duration=?, allowed_roles=? WHERE id=?");
+            $stmt->bind_param("sisi", $exam_name, $duration, $allowed_roles_str, $exam_id);
+            $stmt->execute();
+            $stmt->close();
+
+            // حذف الأسئلة القديمة وإضافة الجديدة
+            $conn->query("DELETE FROM exam_questions WHERE exam_id=$exam_id");
+
+            // 🔴 حذف إجابات المستخدمين السابقين لهذا الامتحان
+            $delete_answers = $conn->prepare("DELETE FROM user_answers WHERE exam_id = ?");
+            $delete_answers->bind_param("i", $exam_id);
+            $delete_answers->execute();
+            $delete_answers->close();
+
+            // 🔴 حذف جلسات الامتحان السابقة للمستخدمين
+            $delete_sessions = $conn->prepare("DELETE FROM user_exam_sessions WHERE exam_id = ?");
+            $delete_sessions->bind_param("i", $exam_id);
+            $delete_sessions->execute();
+            $delete_sessions->close();
+
+        } else {
+            // إضافة امتحان جديد
+            $stmt = $conn->prepare("INSERT INTO exams (exam_name, duration, allowed_roles) VALUES (?, ?, ?)");
+            $stmt->bind_param("sis", $exam_name, $duration, $allowed_roles_str);
+            $stmt->execute();
+            $exam_id = $stmt->insert_id;
+            $stmt->close();
+        }
+
+        // إدخال الأسئلة الجديدة
+        foreach ($selected_questions as $question_id) {
+            $stmt = $conn->prepare("INSERT INTO exam_questions (exam_id, question_id) VALUES (?, ?)");
+            $stmt->bind_param("ii", $exam_id, $question_id);
+            $stmt->execute();
+            $stmt->close();
+        }
+
+        echo "<script>alert('تم تعديل الامتحان وإعادة إرساله للمستخدمين الذين أكملوه.'); window.location.href = 'admin_dashboard.php';</script>";
+        exit();
+    } else {
+        echo "<div class='alert alert-danger'>يرجى ملء جميع الحقول المطلوبة</div>";
+    }
+}
+
+// حذف الامتحان
+if (isset($_GET['delete_exam'])) {
+    $exam_id = $_GET['delete_exam'];
+    
+    // تنفيذ عملية الحذف
+    $conn->query("DELETE FROM exams WHERE id = $exam_id");
+    $conn->query("DELETE FROM exam_questions WHERE exam_id = $exam_id");
+    header("Location: " . $_SERVER['PHP_SELF']);
+    exit;
+}
+
+// استرجاع بيانات المستخدمين
+$users = $conn->query("SELECT * FROM users");
+// استرجاع بيانات الملفات
+$files = $conn->query("SELECT * FROM files");
+
+?>
+
+
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>إدارة المستخدمين والملفات</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+</head>
+<body class="bg-light">
+<a href="logout.php">تسجيل الخروج</a>
+
+<div class="container py-5">
+    <h2 class="text-center mb-4">لوحة التحكم المركزيه</h2>
+
+    <ul class="nav nav-tabs" id="adminTabs" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="users-tab" data-bs-toggle="tab" data-bs-target="#users" type="button" role="tab">إدارة المستخدمين</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="files-tab" data-bs-toggle="tab" data-bs-target="#files" type="button" role="tab">إدارة الملفات</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="exam-tab" data-bs-toggle="tab" data-bs-target="#exam" type="button" role="tab">إدارة الاساله</button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" id="manage_exam-tab" data-bs-toggle="tab" data-bs-target="#manage_exam" type="button" role="tab">إدارة الامتحانات</button>
+        </li>
+        <li class="nav-item" role="presentation">
+        <a class="nav-link" id="results-tab" href="exam_results.php" role="tab">📊 نتائج الامتحانات</a>
+        </li>
+    </ul>
+
+                <div class="tab-content mt-3" id="adminTabsContent">
+                    <!-- إدارة المستخدمين -->
+                    <div class="tab-pane fade show active" id="users" role="tabpanel">
+                    <div class="card p-4 shadow-sm">
+                    <form class="row g-3">
+                        <div class="col-md-6">
+                        <input type="text" id="search_code" name="search_code" class="form-control" placeholder="ابحث برقم الكود">
+                        </div>
+                        <div class="col-md-6">
+                        <button type="button" class="btn btn-primary w-100" onclick="searchUser()">🔍 بحث</button>
+                        </div>
+                    </form>
+                </div>
+                        <div class="card p-4 shadow-sm">
+                            <h4 class="text-center">إدارة المستخدمين</h4>
+                            <form method="POST" class="row g-3">
+                                <input type="hidden" id="id" name="id">
+                                <div class="col-md-6">
+                                    <input type="text" id="name" name="name" class="form-control" placeholder="الاسم" required>
+                                </div>
+                                <div class="col-md-6">
+                                    <input type="text" id="code" name="code" class="form-control" placeholder="الكود" required>
+                                </div>
+                                <div class="col-md-6">
+                                    <input type="password" id="password" name="password" class="form-control" placeholder="كلمة المرور" required>
+                                </div>
+                                <div class="col-md-3">
+                                    <select id="role" name="role" class="form-select">
+                                        <option value="user">مستخدم عادي</option>
+                                        <option value="admin">مدير</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <select id="user_job" name="job" class="form-select" required>
+                                        <option value="" disabled selected>اختر الوظيفة</option>
+                                        <?php foreach ($jobs as $job): ?>
+                                            <option value="<?= $job ?>"><?= ucfirst($job) ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+
+                                <div class="col-md-12">
+                                    <button type="submit" id="submitBtn" name="add_user" class="btn btn-success w-100">إضافة</button>
+                                </div>
+                            </form>
+                            <table class="table table-striped table-bordered mt-4">
+                                <thead class="table-dark">
+                                    <tr>
+                                        <th>#</th>
+                                        <th>الاسم</th>
+                                        <th>الكود</th>
+                                        <th>الدور</th>
+                                        <th>الوظيفة</th>
+                                        <th>تحكم</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php while ($user = $users->fetch_assoc()): ?>
+                                    <tr>
+                                        <td><?= $user['id'] ?></td>
+                                        <td><?= $user['name'] ?></td>
+                                        <td><?= $user['code'] ?></td>
+                                        <td><?= $user['role'] ?></td>
+                                        <td><?= ucfirst($user['job']) ?></td>
+                                        <td>
+                                            <button class='btn btn-warning btn-sm' onclick="editUser(<?= $user['id'] ?>, '<?= $user['name'] ?>', '<?= $user['code'] ?>', '<?= $user['password'] ?>', '<?= $user['role'] ?>', '<?= $user['job'] ?>')">✏ تعديل</button>
+                                            <button class="btn btn-danger btn-sm" onclick="deleteUser(<?= $user['id'] ?>)">❌ حذف</button>
+                                            </td>
+                                    </tr>
+                                    <?php endwhile; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- إدارة الملفات -->
+                    <div class="tab-pane fade" id="files" role="tabpanel">
+                        <div class="card p-4 shadow-sm">
+                            <h4 class="text-center">إدارة الملفات</h4>
+                            <form method="POST" enctype="multipart/form-data" class="row g-3">
+                                <input type="hidden" id="file_id" name="file_id">
+                                <div class="col-md-6">
+                                    <input type="text" id="file_name" name="file_name" class="form-control" placeholder="اسم الملف" required>
+                                </div>
+                                <div class="col-md-6">
+                                    <input type="file" name="file" class="form-control" required>
+                                </div>
+                                <div class="col-md-6">
+                                    <select id="file_job" name="job" class="form-select">
+                                        <?php foreach ($jobs as $job): ?>
+                                        <option value="<?= $job ?>"><?= ucfirst($job) ?></option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div class="col-md-6">
+                                    <button type="submit" id="file_submit" name="add_file" class="btn btn-success w-100">إضافة</button>
+                                </div>
+                            </form>
+                            <table class="table table-striped table-bordered mt-4">
+                                <thead class="table-dark">
+                                    <tr>
+                                        <th>التسلسل</th>
+                                        <th>اسم الملف</th>
+                                        <th>المسموح له</th>
+                                        <th>الرابط</th>
+                                        <th>التحكم</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php while ($file = $files->fetch_assoc()): ?>
+                                    <tr>
+                                        <td><?= $file['id'] ?></td>
+                                        <td><?= $file['file_name'] ?></td>
+                                        <td><?= ucfirst($file['allowed_job']) ?></td>
+                                        <td><a class="btn btn-primary btn-sm" href="<?= $file['file_path'] ?>" target="_blank">📂 عرض</a></td>
+                                        <td>
+                                            <button class='btn btn-warning btn-sm' onclick="editFile(<?= $file['id'] ?>, '<?= $file['file_name'] ?>', '<?= $file['allowed_job'] ?>')">✏ تعديل</button>
+                                            <button class="btn btn-danger btn-sm" onclick="deleteFile(<?= $file['id'] ?>)">❌ حذف</button>
+                                            </td>
+                                    </tr>
+                                    <?php endwhile; ?>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                            <!-- إدارة الاساله -->
+                    <div class="tab-pane fade" id="exam" role="tabpanel">
+                    <h2 class="text-center">إدارة الأسئلة</h2>
+                <div class="card p-4 shadow-sm">
+                    <h4>إضافة / تعديل سؤال</h4>
+                    <form method="POST">
+                        <input type="hidden" name="question_id" id="question_id">
+                        <div class="mb-3">
+                            <label class="form-label">السؤال:</label>
+                            <input type="text" class="form-control" name="question" id="question" required placeholder="أدخل السؤال">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">نوع السؤال:</label>
+                            <select class="form-control" name="type" id="type" onchange="toggleChoices()" required>
+                                <option value="multiple_choice">اختيار من متعدد</option>
+                                <option value="true_false">صح أو خطأ</option>
+                                <option value="text">نصي</option>
+                            </select>
+                        </div>
+                        <div id="choices_div" class="mb-3" style="display:none;">
+                            <label class="form-label">أدخل الخيارات وحدد الإجابة الصحيحة:</label>
+                            <div class="input-group mb-2">
+                                <input type="radio" name="correct_choice" value="0" required>
+                                <input type="text" class="form-control" name="choices[]" placeholder="الخيار 1">
+                            </div>
+                            <div class="input-group mb-2">
+                                <input type="radio" name="correct_choice" value="1">
+                                <input type="text" class="form-control" name="choices[]" placeholder="الخيار 2">
+                            </div>
+                            <div class="input-group mb-2">
+                                <input type="radio" name="correct_choice" value="2">
+                                <input type="text" class="form-control" name="choices[]" placeholder="الخيار 3">
+                            </div>
+                            <div class="input-group mb-2">
+                                <input type="radio" name="correct_choice" value="3">
+                                <input type="text" class="form-control" name="choices[]" placeholder="الخيار 4">
+                            </div>
+                        </div>
+                        <div id="true_false_div" class="mb-3" style="display:none;">
+                            <label class="form-label">الإجابة الصحيحة:</label>
+                            <select class="form-control" name="correct_answer" id="correct_answer">
+                                <option value="true">صح</option>
+                                <option value="false">خطأ</option>
+                            </select>
+                        </div>
+                        <button type="submit" name="save_question" class="btn btn-primary">حفظ</button>
+                    </form>
+                </div>
+                <h2 class="mt-5">الأسئلة المضافة</h2>
+                <ul class="list-group mt-3">
+                    <?php while ($row = $questions->fetch_assoc()) { ?>
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <span><?= $row['question'] ?> <span class="badge bg-secondary"><?= $row['type'] ?></span></span>
+                            <div>
+                                <button onclick="editQuestion(<?= $row['id'] ?>, '<?= addslashes($row['question']) ?>', '<?= $row['type'] ?>', '<?= $row['correct_answer'] ?>')" class="btn btn-warning btn-sm">تعديل</button>
+                                <button onclick="deleteQuestion(<?= $row['id'] ?>)" class="btn btn-danger btn-sm">حذف</button>
+                            </div>
+                        </li>
+                    <?php } ?>
+                </ul>
+                <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+<script>
+    function editQuestion(id, question, type, correct_answer) {
+        document.getElementById("question_id").value = id;
+        document.getElementById("question").value = question;
+        document.getElementById("type").value = type;
+        
+        // تحديث الخيارات بناءً على نوع السؤال
+        toggleChoices();
+
+        if (type === "true_false") {
+            document.getElementById("correct_answer").value = correct_answer;
+        }
+    }
+
+    function deleteQuestion(questionId) {
+        Swal.fire({
+            title: "هل أنت متأكد؟",
+            text: "لن تتمكن من استعادة هذا السؤال بعد الحذف!",
+            icon: "warning",
+            showCancelButton: true,
+            confirmButtonColor: "#d33",
+            cancelButtonColor: "#3085d6",
+            confirmButtonText: "نعم، احذفه!",
+            cancelButtonText: "إلغاء"
+        }).then((result) => {
+            if (result.isConfirmed) {
+                // إنشاء نموذج لحذف السؤال وإرساله تلقائيًا
+                var form = document.createElement("form");
+                form.method = "POST";
+                form.action = window.location.href;
+
+                var inputDelete = document.createElement("input");
+                inputDelete.type = "hidden";
+                inputDelete.name = "delete_question";
+                inputDelete.value = "1";
+
+                var inputId = document.createElement("input");
+                inputId.type = "hidden";
+                inputId.name = "question_id";
+                inputId.value = questionId;
+
+                form.appendChild(inputDelete);
+                form.appendChild(inputId);
+                document.body.appendChild(form);
+                form.submit();
+            }
+        });
+    }
+</script>
+
+
+                <script>
+                    function toggleChoices() {
+                        var type = document.getElementById("type").value;
+                        document.getElementById("choices_div").style.display = (type == "multiple_choice") ? "block" : "none";
+                        document.getElementById("true_false_div").style.display = (type == "true_false") ? "block" : "none";
+                    }
+
+                    function editQuestion(id, question, type, correct_answer) {
+                        document.getElementById("question_id").value = id;
+                        document.getElementById("question").value = question;
+                        document.getElementById("type").value = type;
+                        document.getElementById("correct_answer").value = correct_answer;
+                        toggleChoices();
+                    }
+                    document.querySelector("form").addEventListener("submit", function(event) {
+                var type = document.getElementById("type").value;
+                if (type === "multiple_choice") {
+                    var checked = document.querySelector('input[name="correct_choice"]:checked');
+                    if (!checked) {
+                        alert("يرجى تحديد الإجابة الصحيحة!");
+                        event.preventDefault(); // منع إرسال النموذج
+                    }
+                }
+            });
+
+                </script>
+
+                <script>
+                    function toggleChoices() {
+                var type = document.getElementById("type").value;
+                var choicesDiv = document.getElementById("choices_div");
+                var trueFalseDiv = document.getElementById("true_false_div");
+
+                if (type === "multiple_choice") {
+                    choicesDiv.style.display = "block";
+                    trueFalseDiv.style.display = "none";
+                    document.querySelectorAll('input[name="correct_choice"]').forEach(input => input.required = true);
+                } else {
+                    choicesDiv.style.display = "none";
+                    trueFalseDiv.style.display = (type === "true_false") ? "block" : "none";
+                    document.querySelectorAll('input[name="correct_choice"]').forEach(input => input.required = false);
+                }
+            }
+                </script>
+
+            </div>
+                            <!-- إدارة الامتحانات -->
+                <div class="tab-pane fade" id="manage_exam" role="tabpanel">
+
+                
+                <h2 class="text-center">إدارة وإنشاء الامتحانات</h2>
+
+                <!-- نموذج إنشاء / تعديل امتحان -->
+                <div class="card p-4 shadow-sm mb-4">
+                    <h4 id="form-title">إنشاء امتحان جديد</h4>
+                    <form method="POST">
+                        <input type="hidden" name="exam_id" id="exam_id">
+                        <div class="mb-3">
+                            <label class="form-label">عنوان الامتحان:</label>
+                            <input type="text" class="form-control" name="exam_name" id="exam_name" required>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">مدة الامتحان (بالدقائق):</label>
+                            <input type="number" class="form-control" name="duration" id="duration" required min="1">
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">الأدوار المسموح لها:</label>
+                            <select class="form-control" name="allowed_roles[]" id="allowed_roles" multiple required>
+                                <?php while ($role = $roles_result->fetch_assoc()) { ?>
+                                    <option value="<?= $role['job'] ?>"><?= $role['job'] ?></option>
+                                <?php } ?>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">اختر الأسئلة:</label>
+                            <br>
+                            <br>
+                            <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-3 border p-3" style="max-height: 300px; overflow-y: auto;">
+                                <?php while ($question = $questions_result->fetch_assoc()) { ?>
+                                    <div class="col">
+                                        <div class="card shadow-sm border-0">
+                                            <div class="card-body">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="checkbox" name="selected_questions[]" value="<?= $question['id'] ?>">
+                                                    <label class="form-check-label fw-bold">
+                                                        <?= htmlspecialchars($question['question']) ?>
+                                                    </label>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                <?php } ?>
+                            </div>
+                        </div>
+
+                        <button type="submit" name="save_exam" class="btn btn-primary">حفظ الامتحان</button>
+                    </form>
+                </div>
+
+                <!-- عرض الامتحانات -->
+                <div class="card p-4 shadow-sm">
+                    <h4>قائمة الامتحانات</h4>
+                    <table class="table table-bordered">
+                        <thead>
+                            <tr>
+                                <th>العنوان</th>
+                                <th>المدة (دقائق)</th>
+                                <th>الأدوار المسموح لها</th>
+                                <th>إجراءات</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php while ($exam = $exams_result->fetch_assoc()) { ?>
+                                <tr>
+                                    <td><?= $exam['exam_name'] ?></td>
+                                    <td><?= $exam['duration'] ?></td>
+                                    <td><?= $exam['allowed_roles'] ?></td>
+                                    <td>
+                                        <button class="btn btn-warning btn-sm" onclick="editExam(<?= $exam['id'] ?>, '<?= $exam['exam_name'] ?>', <?= $exam['duration'] ?>, '<?= $exam['allowed_roles'] ?>')">تعديل</button>
+                                        <button class="btn btn-danger btn-sm" onclick="confirmDelete(<?= $exam['id'] ?>)">حذف</button>
+                                        </td>
+                                </tr>
+                            <?php } ?>
+                        </tbody>
+                    </table>
+                </div>
+
+            <script>
+            function editExam(id, name, duration, roles) {
+                document.getElementById('exam_id').value = id;
+                document.getElementById('exam_name').value = name;
+                document.getElementById('duration').value = duration;
+                document.getElementById('form-title').innerText = 'تعديل الامتحان';
+            }
+            </script>
+            <script>
+                function confirmDelete(examId) {
+                    Swal.fire({
+                        title: "هل أنت متأكد؟",
+                        text: "لن تتمكن من التراجع عن هذا الحذف!",
+                        icon: "warning",
+                        showCancelButton: true,
+                        confirmButtonColor: "#d33",
+                        cancelButtonColor: "#3085d6",
+                        confirmButtonText: "نعم، احذف!",
+                        cancelButtonText: "إلغاء"
+                    }).then((result) => {
+        if (result.isConfirmed) {
+            fetch(window.location.href + "?delete_exam=" + examId, {
+                method: "GET"
+            }).then(response => {
+                if (response.ok) {
+                    Swal.fire("تم الحذف!", "تم حذف الامتحان بنجاح.", "success")
+                        .then(() => location.reload());
+                } else {
+                    Swal.fire("خطأ!", "حدث خطأ أثناء الحذف.", "error");
+                }
+            }).catch(error => {
+                console.error("Error:", error);
+                Swal.fire("خطأ!", "لم يتمكن النظام من حذف المستخدم.", "error");
+            });
+        }
+    });
+}
+                    </script>
+                    </div>
+                    </div>
+                </div>
+            </div>
+
+<script>
+    function searchUser() {
+    let searchCode = document.getElementById("search_code").value.trim();
+    if (searchCode === "") {
+        alert("يرجى إدخال كود للبحث!");
+        return;
+    }
+
+    let formData = new FormData();
+    formData.append("search_code", searchCode);
+
+    fetch(window.location.href, {
+        method: "POST",
+        body: formData
+    })
+    .then(response => response.text())
+    .then(data => {
+        document.querySelector("tbody").innerHTML = data;
+    })
+    .catch(error => console.error("Error:", error));
+}
+
+
+
+</script>
+    <script>
+        function editUser(id, name, code, password, role, job) {
+            document.getElementById('id').value = id;
+            document.getElementById('name').value = name;
+            document.getElementById('code').value = code;
+            document.getElementById('password').value = password ;
+            document.getElementById('role').value = role;
+            document.getElementById('user_job').value = job;
+            document.getElementById('submitBtn').name = 'edit_user';
+            document.getElementById('submitBtn').textContent = 'تعديل';
+        }
+    </script>
+    <script>
+        function deleteUser(userId) {
+    Swal.fire({
+        title: "هل أنت متأكد؟",
+        text: "لن تتمكن من استعادة هذا المستخدم بعد الحذف!",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonColor: "#d33",
+        cancelButtonColor: "#3085d6",
+        confirmButtonText: "نعم، احذفه!",
+        cancelButtonText: "إلغاء"
+    }).then((result) => {
+        if (result.isConfirmed) {
+            fetch(window.location.href + "?delete_user=" + userId, {
+                method: "GET"
+            }).then(response => {
+                if (response.ok) {
+                    Swal.fire("تم الحذف!", "تم حذف المستخدم بنجاح.", "success")
+                        .then(() => location.reload());
+                } else {
+                    Swal.fire("خطأ!", "حدث خطأ أثناء الحذف.", "error");
+                }
+            }).catch(error => {
+                console.error("Error:", error);
+                Swal.fire("خطأ!", "لم يتمكن النظام من حذف المستخدم.", "error");
+            });
+        }
+    });
+}
+
+    </script>
+    <script>
+        function editFile(id, name, job) {
+            document.getElementById('file_id').value = id;
+            document.getElementById('file_name').value = name;
+            document.getElementById('file_job').value = job;
+            document.getElementById('file_submit').name = 'edit_file';
+            document.getElementById('file_submit').textContent = 'تعديل';
+        }
+    </script>
+
+    <script>
+        function deleteFile(fileId) {
+    Swal.fire({
+        title: "هل أنت متأكد؟",
+        text: "لن تتمكن من استعادة هذا الملف بعد الحذف!",
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonColor: "#d33",
+        cancelButtonColor: "#3085d6",
+        confirmButtonText: "نعم، احذفه!",
+        cancelButtonText: "إلغاء"
+    }).then((result) => {
+        if (result.isConfirmed) {
+            fetch(window.location.href + "?delete_file=" + fileId, {
+                method: "GET"
+            }).then(response => {
+                if (response.ok) {
+                    Swal.fire("تم الحذف!", "تم حذف الملف بنجاح.", "success")
+                        .then(() => location.reload());
+                } else {
+                    Swal.fire("خطأ!", "حدث خطأ أثناء الحذف.", "error");
+                }
+            }).catch(error => {
+                console.error("Error:", error);
+                Swal.fire("خطأ!", "لم يتمكن النظام من حذف الملف.", "error");
+            });
+        }
+    });
+}
+
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>
+</body>
+</html>
+===================================================================================================================================================================================
+results
+<?php
+session_start();
+$host = "localhost";
+$user = "root";
+$pass = "";
+$dbname = "my_database";
+
+$conn = new mysqli($host, $user, $pass, $dbname);
+if ($conn->connect_error) {
+    die("فشل الاتصال بقاعدة البيانات: " . $conn->connect_error);
+}
+
+// التحقق من تسجيل الدخول كأدمن
+if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'admin') {
+    header("Location: login.php");
+    exit();
+}
+
+// استعلام البحث عن نتائج المستخدم بناءً على كود المستخدم
+$user_code_search = "";
+$whereClause = "";
+$params = [];
+$types = "";
+
+// إذا تم إدخال كود المستخدم، يتم تطبيق البحث
+if (isset($_GET['user_code']) && !empty($_GET['user_code'])) {
+    $user_code_search = trim($_GET['user_code']);
+    $whereClause = " WHERE u.code LIKE ?";
+    $params[] = "%" . $user_code_search . "%"; // البحث الجزئي
+    $types .= "s";
+}
+
+// تحضير الاستعلام لجلب بيانات المستخدمين ونتائج الامتحانات
+$query = "
+    SELECT u.id AS user_id, u.name AS user_name, u.code AS user_code, e.exam_name AS exam_title, 
+           COUNT(CASE WHEN q.type != 'text' THEN q.id END) AS total_questions, -- استبعاد الأسئلة النصية من العد
+           SUM(CASE WHEN q.type != 'text' AND q.correct_answer = ua.user_answer THEN 1 ELSE 0 END) AS correct_answers,
+           GROUP_CONCAT(CASE WHEN q.type = 'text' THEN CONCAT(q.question, ' | ', ua.user_answer) END SEPARATOR '||') AS text_answers -- تجميع الأسئلة النصية مع إجابات المستخدم
+    FROM user_answers ua
+    JOIN questions q ON ua.question_id = q.id
+    JOIN exams e ON ua.exam_id = e.id
+    JOIN users u ON ua.user_id = u.id
+    $whereClause
+    GROUP BY ua.user_id, ua.exam_id
+    ORDER BY u.name, e.exam_name
+";
+
+$stmt = $conn->prepare($query);
+
+// ربط المعاملات إذا تم إدخال كود المستخدم
+if (!empty($params)) {
+    $stmt->bind_param($types, ...$params);
+}
+
+$stmt->execute();
+$result = $stmt->get_result();
+?>
+
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <title>نتائج الامتحانات - لوحة التحكم</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</head>
+<body>
+<a href="logout.php">تسجيل الخروج</a>
+
+<div class="container mt-4">
+    <h2 class="text-center">📊 نتائج الامتحانات</h2>
+
+    <!-- نموذج البحث -->
+    <form method="GET" class="d-flex justify-content-center mb-4">
+        <input type="text" name="user_code" class="form-control w-25" placeholder="🔍 أدخل كود المستخدم" value="<?= htmlspecialchars($user_code_search) ?>">
+        <button type="submit" class="btn btn-primary ms-2">🔍 بحث</button>
+        <a href="exam_results.php" class="btn btn-secondary ms-2">🔄 عرض الكل</a>
+    </form>
+
+    <?php if ($result->num_rows > 0): ?>
+        <table class="table table-bordered">
+            <thead>
+                <tr>
+                    <th>👤 اسم المستخدم</th>
+                    <th>🆔 كود المستخدم</th>
+                    <th>📑 اسم الامتحان</th>
+                    <th>❓ عدد الأسئلة</th>
+                    <th>✅ الإجابات الصحيحة</th>
+                    <th>📊 النسبة المئوية</th>
+                    <th>✍️ الإجابات النصية</th> <!-- زر عرض الإجابات النصية -->
+                </tr>
+            </thead>
+            <tbody>
+                <?php while ($row = $result->fetch_assoc()): 
+                    $score_percentage = ($row['total_questions'] > 0) ? round(($row['correct_answers'] / $row['total_questions']) * 100, 2) : 0;
+                    $modal_id = "textAnswersModal_" . $row['user_id']; // تعريف ID لكل مستخدم للنافذة المنبثقة
+                ?>
+                    <tr>
+                        <td><?= htmlspecialchars($row['user_name']) ?></td>
+                        <td><?= htmlspecialchars($row['user_code']) ?></td>
+                        <td><?= htmlspecialchars($row['exam_title']) ?></td>
+                        <td><?= $row['total_questions'] ?></td>
+                        <td><?= $row['correct_answers'] ?></td>
+                        <td><?= $score_percentage ?>%</td>
+                        <td>
+                            <?php if (!empty($row['text_answers'])): ?>
+                                <!-- زر عرض الإجابات النصية -->
+                                <button class="btn btn-info btn-sm" data-bs-toggle="modal" data-bs-target="#<?= $modal_id ?>">📄 عرض</button>
+                                
+                                <!-- النافذة المنبثقة لعرض الإجابات النصية -->
+                                <div class="modal fade" id="<?= $modal_id ?>" tabindex="-1" aria-labelledby="modalLabel_<?= $row['user_id'] ?>" aria-hidden="true">
+                                    <div class="modal-dialog">
+                                        <div class="modal-content">
+                                            <div class="modal-header">
+                                                <h5 class="modal-title" id="modalLabel_<?= $row['user_id'] ?>">✍️ إجابات <?= htmlspecialchars($row['user_name']) ?></h5>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="إغلاق"></button>
+                                            </div>
+                                            <div class="modal-body">
+                                                <?php 
+                                                    $text_answers = explode('||', $row['text_answers']);
+                                                    foreach ($text_answers as $answer) {
+                                                        list($question_text, $user_answer) = explode('|', $answer);
+                                                        echo "<p><strong>📝 السؤال:</strong> " . htmlspecialchars($question_text) . "</p>";
+                                                        echo "<p><strong>✅ إجابة المستخدم:</strong> " . htmlspecialchars($user_answer) . "</p>";
+                                                        echo "<hr>";
+                                                    }
+                                                ?>
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إغلاق</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            <?php else: ?>
+                                ❌ لا توجد إجابات نصية
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                <?php endwhile; ?>
+            </tbody>
+        </table>
+    <?php else: ?>
+        <p class="text-center">❌ لا يوجد أي نتائج.</p>
+    <?php endif; ?>
+</div>
+
+<div class="text-center mt-4">
+    <a href="admin_dashboard.php" class="btn btn-secondary">🏠 العودة للوحة التحكم</a>
+</div>
+
+</body>
+</html>
+
+<?php
+$stmt->close();
+$conn->close();
+?>
+================================================================================================================
+user
+<?php
+session_start();
+$host = "localhost";
+$user = "root";
+$pass = "";
+$dbname = "my_database";
+
+$conn = new mysqli($host, $user, $pass, $dbname);
+
+if ($conn->connect_error) {
+    die("فشل الاتصال بقاعدة البيانات: " . $conn->connect_error);
+}
+
+// التحقق من تسجيل الدخول
+if (!isset($_SESSION['user_id']) || $_SESSION['role'] != 'user') {
+    header("Location: login.php");
+    exit();
+}
+
+
+// منع تخزين الصفحة في المتصفح بعد تسجيل الخروج
+header("Cache-Control: no-store, no-cache, must-revalidate, max-age=0");
+header("Cache-Control: post-check=0, pre-check=0", false);
+header("Pragma: no-cache");
+
+$user_name = $_SESSION['name'];
+$user_job = $_SESSION['job']; // الوظيفة الخاصة بالمستخدم
+
+// جلب الملفات المتاحة لوظيفة المستخدم
+$sql = "SELECT * FROM files WHERE allowed_job = '$user_job' ORDER BY category";
+$result = $conn->query($sql);
+
+$categories = []; // مصفوفة لتخزين الملفات حسب التصنيف
+
+if ($result) {
+    while ($file = $result->fetch_assoc()) {
+        $category = $file['category'] ?? 'other'; // تجنب الأخطاء في حالة عدم وجود تصنيف
+        $categories[$category][] = $file;
+    }
+} else {
+    echo "❌ خطأ في جلب الملفات: " . $conn->error;
+}
+
+// جلب الامتحانات المسموح بها للمستخدم
+$exams = [];
+$sql = "SELECT id, exam_name FROM exams WHERE allowed_roles = ?";
+$stmt = $conn->prepare($sql);
+$stmt->bind_param("s", $user_job);
+$stmt->execute();
+$result = $stmt->get_result();
+
+while ($exam = $result->fetch_assoc()) {
+    $exams[] = $exam;
+}
+$stmt->close();
+
+?>
+
+
+
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <title>صفحة المستخدم</title>
+    
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+    <link rel="stylesheet" href="./Garnell.web/style.css">
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; margin-top: 20px; }
+        .file-container { width: 80%; margin: auto; display: flex; flex-wrap: wrap; justify-content: center; gap: 20px; }
+        .file-box { border: 1px solid #ddd; padding: 10px; width: 45%; text-align: center; }
+        iframe, video { width: 100%; height: 250px; }
+    </style>
+</head>
+<body>
+
+    <h2>مرحبًا، <?= $user_name ?> 👋</h2>
+    <p>وظيفتك: <strong><?= ucfirst($user_job) ?></strong></p>
+    
+
+    <h3>: الملفات المتاحة لك📂 </h3>
+<div class="btn-group mb-3 ">
+    <button class="btn btn-primary" onclick="showCategory('pdf')">📄 PDF</button>
+    <button class="btn btn-success" onclick="showCategory('video')">🎥 الفيديوهات</button>
+    <button class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#examModal">📑 الامتحان</button>
+</div>
+
+<div class="file-container" id="filesContainer">
+    <?php foreach ($categories as $category => $files): ?>
+        <?php foreach ($files as $file): ?>
+            <?php 
+                $file_ext = pathinfo($file['file_path'], PATHINFO_EXTENSION);
+                $category_type = in_array($file_ext, ['mp4', 'webm', 'ogg']) ? 'video' : ($file_ext == 'pdf'  ? 'pdf' : 'other');
+            ?>
+            <div class="file-box" data-category="<?= $category_type ?>">
+                <h4><?= $file['file_name'] ?></h4>
+                <?php if ($file_ext == 'pdf'): ?>
+                    <div class="d-flex justify-content-center gap-2">
+                        <a href="<?= $file['file_path'] ?>" target="_blank" class="btn btn-primary">👁️ عرض</a>
+                        <a href="<?= $file['file_path'] ?>" download class="btn btn-success">⬇️ تحميل</a>
+                    </div>
+                <?php elseif (in_array($file_ext, ['mp4', 'webm', 'ogg'])): ?>
+                    <div class="d-flex justify-content-center gap-2">
+                        <a href="<?= $file['file_path'] ?>" target="_blank" class="btn btn-primary">👁️ عرض</a>
+                        <a href="<?= $file['file_path'] ?>" download class="btn btn-success">⬇️ تحميل</a>
+                    </div>
+                <?php else: ?>
+                    <p>❌ ملف غير مدعوم.</p>
+                <?php endif; ?>
+            </div>
+        <?php endforeach; ?>
+    <?php endforeach; ?>
+</div>
+<!-- نافذة منبثقة لعرض الامتحانات -->
+<div class="modal fade" id="examModal" tabindex="-1" aria-labelledby="examModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="examModalLabel">📑 الامتحانات المتاحة</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="إغلاق"></button>
+            </div>
+            <div class="modal-body">
+                <?php if (!empty($exams)): ?>
+                    <ul class="list-group">
+                        <?php foreach ($exams as $exam): ?>
+                            <li class="list-group-item d-flex justify-content-between align-items-center">
+                                <?= htmlspecialchars($exam['exam_name']) ?>
+                                <a href="exam_success.php?exam_id=<?= $exam['id'] ?>" class="btn btn-primary btn-sm">📝 بدء الامتحان</a>
+                            </li>
+                        <?php endforeach; ?>
+                    </ul>
+                <?php else: ?>
+                    <p class="text-center">❌ لا يوجد امتحانات متاحة لك.</p>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- سكريبت التحكم -->
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    let files = document.querySelectorAll('.file-box');
+    files.forEach(file => file.style.display = 'none'); // إخفاء جميع الملفات عند تحميل الصفحة
+});
+
+function showCategory(category) {
+    let files = document.querySelectorAll('.file-box');
+
+    if (category === 'exam') {
+        var examModal = new bootstrap.Modal(document.getElementById('examModal'));
+        examModal.show();
+        return;
+    }
+
+    files.forEach(file => {
+        file.style.display = (file.getAttribute('data-category') === category) ? 'block' : 'none';
+    });
+}
+</script>
+
+
+<a href="logout.php">تسجيل الخروج</a>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    let files = document.querySelectorAll('.file-box');
+    files.forEach(file => file.style.display = 'none'); // إخفاء جميع الملفات عند تحميل الصفحة
+});
+
+function showCategory(category) {
+    let files = document.querySelectorAll('.file-box');
+
+    if (category === 'exam') {
+        window.location.href = "./exam_success.php";
+        return; // إيقاف تنفيذ باقي الكود بعد التوجيه
+    }
+
+    files.forEach(file => {
+        file.style.display = (file.getAttribute('data-category') === category) ? 'block' : 'none';
+    });
+}
+</script>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz" crossorigin="anonymous"></script>    
+</body>
+</html>
+
+<?php $conn->close(); ?>
+=================================================================================================================================================================
+success
+<?php
+session_start();
+$host = "localhost";
+$user = "root";
+$pass = "";
+$dbname = "my_database";
+$conn = new mysqli($host, $user, $pass, $dbname);
+
+if ($conn->connect_error) {
+    die("فشل الاتصال بقاعدة البيانات: " . $conn->connect_error);
+}
+
+if (!isset($_SESSION['user_id'])) {
+    header('Location: login.php');
+    exit();
+}
+
+$user_id = $_SESSION['user_id'];
+
+// التحقق من وجود exam_id في الرابط
+if (!isset($_GET['exam_id']) || empty($_GET['exam_id'])) {
+    echo "<p class='text-danger text-center'>⚠️ يجب اختيار امتحان للمتابعة.</p>";
+    exit();
+}
+
+$exam_id = intval($_GET['exam_id']); // تأمين المدخلات
+
+// التحقق مما إذا كان المستخدم قد أكمل الامتحان مسبقًا
+$check_query = $conn->prepare("SELECT * FROM user_answers WHERE user_id = ? AND exam_id = ?");
+$check_query->bind_param("ii", $user_id, $exam_id);
+$check_query->execute();
+$result = $check_query->get_result();
+
+if ($result->num_rows > 0) {
+    echo "<p class='text-danger text-center'>❌ لقد أكملت هذا الامتحان من قبل، لا يمكنك إعادة الدخول.</p>";
+    exit();
+}
+
+// جلب تفاصيل الامتحان
+$query = $conn->prepare("SELECT * FROM exams WHERE id = ?");
+$query->bind_param("i", $exam_id);
+$query->execute();
+$result = $query->get_result();
+$exam = $result->fetch_assoc();
+
+if (!$exam) {
+    echo "<p class='text-danger text-center'>⚠️ الامتحان غير موجود.</p>";
+    exit();
+}
+
+$exam_title = $exam['title'];
+$exam_duration = $exam['duration']; // المدة بالدقائق
+
+// التحقق مما إذا كان للمستخدم وقت بدء مسجل مسبقًا
+$start_time_query = $conn->prepare("SELECT start_time FROM user_exam_sessions WHERE user_id = ? AND exam_id = ?");
+$start_time_query->bind_param("ii", $user_id, $exam_id);
+$start_time_query->execute();
+$start_time_result = $start_time_query->get_result();
+
+if ($start_time_result->num_rows > 0) {
+    $row = $start_time_result->fetch_assoc();
+    $start_time = strtotime($row['start_time']);
+} else {
+    // إذا لم يكن هناك وقت بدء، احفظ وقت بدء جديد
+    $current_time = date("Y-m-d H:i:s");
+    $insert_start_time = $conn->prepare("INSERT INTO user_exam_sessions (user_id, exam_id, start_time) VALUES (?, ?, ?)");
+    $insert_start_time->bind_param("iis", $user_id, $exam_id, $current_time);
+    $insert_start_time->execute();
+    $start_time = strtotime($current_time);
+}
+
+// حساب الوقت المتبقي
+$current_time = time();
+$elapsed_time = $current_time - $start_time;
+$remaining_time = max(($exam_duration * 60) - $elapsed_time, 0);
+
+// جلب الأسئلة المرتبطة بالامتحان
+$query = $conn->prepare("
+    SELECT q.* FROM questions q
+    JOIN exam_questions eq ON q.id = eq.question_id
+    WHERE eq.exam_id = ?
+");
+$query->bind_param("i", $exam_id);
+$query->execute();
+$questions = $query->get_result();
+?>
+
+<!DOCTYPE html>
+<html lang="ar">
+<head>
+    <meta charset="UTF-8">
+    <title>أداء الامتحان</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <script>
+        let timeLeft = <?php echo $remaining_time; ?>;
+
+        function startTimer() {
+            let timerElement = document.getElementById("timer");
+            let interval = setInterval(function () {
+                let minutes = Math.floor(timeLeft / 60);
+                let seconds = timeLeft % 60;
+                timerElement.innerHTML = minutes + ":" + (seconds < 10 ? "0" : "") + seconds;
+                if (timeLeft <= 0) {
+                    clearInterval(interval);
+                    document.getElementById("examForm").submit();
+                }
+                timeLeft--;
+            }, 1000);
+        }
+    </script>
+</head>
+<body onload="startTimer()">
+    <div class="container mt-5">
+        <h2 class="text-center"><?php echo htmlspecialchars($exam_title); ?></h2>
+        <p class="text-center text-danger">الوقت المتبقي: <span id="timer"></span></p>
+        <form id="examForm" method="post" action="submit_exam.php">
+            <input type="hidden" name="exam_id" value="<?php echo $exam_id; ?>">
+            <input type="hidden" name="user_id" value="<?php echo $user_id; ?>">
+
+            <?php while ($question = $questions->fetch_assoc()) { ?>
+                <div class="mb-3">
+                    <p><strong><?php echo htmlspecialchars($question['question']); ?></strong></p>
+
+                    <?php if ($question['type'] == 'multiple_choice') { 
+                        // جلب الاختيارات من جدول choices
+                        $query_choices = $conn->prepare("SELECT * FROM choices WHERE question_id = ?");
+                        $query_choices->bind_param("i", $question['id']);
+                        $query_choices->execute();
+                        $choices = $query_choices->get_result();
+                    ?>
+                        <?php while ($choice = $choices->fetch_assoc()) { ?>
+                            <div class="form-check">
+                                <input class="form-check-input" type="radio" name="answer[<?php echo $question['id']; ?>]" value="<?php echo htmlspecialchars($choice['choice_text']); ?>" required>
+                                <label class="form-check-label">
+                                    <?php echo htmlspecialchars($choice['choice_text']); ?>
+                                </label>
+                            </div>
+                        <?php } ?>
+
+                    <?php } elseif ($question['type'] == 'true_false') { ?>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="answer[<?php echo $question['id']; ?>]" value="true" required>
+                            <label class="form-check-label">صح</label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="answer[<?php echo $question['id']; ?>]" value="false" required>
+                            <label class="form-check-label">خطأ</label>
+                        </div>
+
+                    <?php } else { ?>
+                        <input type="text" class="form-control" name="answer[<?php echo $question['id']; ?>]" required>
+                    <?php } ?>
+                </div>
+            <?php } ?>
+
+            <button type="submit" class="btn btn-primary">إرسال الإجابات</button>
+        </form>
+    </div>
+</body>
+</html>
+==========================================================================================================================
+submit_exam
+<?php
+session_start();
+$host = "localhost";
+$user = "root";
+$pass = "";
+$dbname = "my_database";
+$conn = new mysqli($host, $user, $pass, $dbname);
+
+if ($conn->connect_error) {
+    die("فشل الاتصال بقاعدة البيانات: " . $conn->connect_error);
+}
+
+if (!isset($_SESSION['user_id'])) {
+    header('Location: login.php');
+    exit();
+}
+
+$user_id = $_SESSION['user_id'];
+
+if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['exam_id'])) {
+    $exam_id = $_POST['exam_id'];
+
+    // التحقق مما إذا كان المستخدم قد قدم الامتحان بالفعل
+    $check_query = $conn->prepare("SELECT * FROM user_answers WHERE user_id = ? AND exam_id = ?");
+    $check_query->bind_param("ii", $user_id, $exam_id);
+    $check_query->execute();
+    $result = $check_query->get_result();
+
+    if ($result->num_rows > 0) {
+        echo "<script>alert('لقد قمت بإرسال هذا الامتحان من قبل!'); window.location.href = 'user_dashboard.php';</script>";
+        exit();
+    }
+
+    // إدراج الإجابات في قاعدة البيانات
+    $stmt = $conn->prepare("INSERT INTO user_answers (user_id, exam_id, question_id, user_answer) VALUES (?, ?, ?, ?)");
+
+    foreach ($_POST['answer'] as $question_id => $user_answer) {
+        $stmt->bind_param("iiis", $user_id, $exam_id, $question_id, $user_answer);
+        $stmt->execute();
+    }
+
+    // إغلاق الاتصال
+    $stmt->close();
+    $conn->close();
+
+    // عرض رسالة نجاح ثم إعادة التوجيه إلى صفحة `user_dashboard.php`
+    echo "<script>
+            alert('✅ تم إرسال إجاباتك بنجاح!');
+            window.location.href = 'user_dashboard.php';
+          </script>";
+    exit();
+} else {
+    header("Location: user_dashboard.php");
+    exit();
+}
+?>
