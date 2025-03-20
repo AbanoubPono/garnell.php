@@ -656,27 +656,57 @@ $files = $conn->query("SELECT * FROM files");
                                 <?php } ?>
                             </select>
                         </div>
-                        <div class="mb-3">
-                            <label class="form-label">اختر الأسئلة:</label>
-                            <br>
-                            <br>
-                            <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-3 border p-3" style="max-height: 300px; overflow-y: auto;">
-                                <?php while ($question = $questions_result->fetch_assoc()) { ?>
-                                    <div class="col">
-                                        <div class="card shadow-sm border-0">
-                                            <div class="card-body">
-                                                <div class="form-check">
-                                                    <input class="form-check-input" type="checkbox" name="selected_questions[]" value="<?= $question['id'] ?>">
-                                                    <label class="form-check-label fw-bold">
-                                                        <?= htmlspecialchars($question['question']) ?>
-                                                    </label>
-                                                </div>
+                                            <div class="mb-3">
+                                                        <!-- زر فتح النافذة المنبثقة -->
+                            <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#questionsModal">
+                                اختر الأسئلة
+                            </button>
+
+                            <!-- النافذة المنبثقة -->
+                            <div class="modal fade" id="questionsModal" tabindex="-1" aria-labelledby="questionsModalLabel" aria-hidden="true">
+                                <div class="modal-dialog modal-lg">
+                                    <div class="modal-content">
+                                        <div class="modal-header">
+                                            <h5 class="modal-title" id="questionsModalLabel">اختر الأسئلة</h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="إغلاق"></button>
+                                        </div>
+                                        <div class="modal-body">
+                                            <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-3 border p-3" style="max-height: 300px; overflow-y: auto;">
+                                                <?php while ($question = $questions_result->fetch_assoc()) { ?>
+                                                    <div class="col">
+                                                        <div class="card shadow-sm border-0">
+                                                            <div class="card-body">
+                                                                <div class="form-check">
+                                                                    <input class="form-check-input" type="checkbox" name="selected_questions[]" value="<?= $question['id'] ?>">
+                                                                    <label class="form-check-label fw-bold">
+                                                                        <?= htmlspecialchars($question['question']) ?>
+                                                                    </label>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                <?php } ?>
                                             </div>
                                         </div>
+                                        <div class="modal-footer">
+                                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إغلاق</button>
+                                            <button type="button" class="btn btn-success" id="saveQuestions">حفظ الاختيارات</button>
+                                        </div>
                                     </div>
-                                <?php } ?>
+                                </div>
                             </div>
-                        </div>
+
+                            <!-- جافا سكريبت لحفظ الاختيارات -->
+                            <script>
+                            document.getElementById("saveQuestions").addEventListener("click", function() {
+                                alert("تم حفظ الأسئلة المحددة!");
+                                var modal = new bootstrap.Modal(document.getElementById('questionsModal'));
+                                modal.hide();
+                            });
+                            </script>
+
+                            <br>
+                            <br>
 
                         <button type="submit" name="save_exam" class="btn btn-primary">حفظ الامتحان</button>
                     </form>
