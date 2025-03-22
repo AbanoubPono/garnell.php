@@ -321,7 +321,7 @@ $files = $conn->query("SELECT * FROM files");
     
 </head>
 <body class="bg-light">
-<a href="logout.php">تسجيل الخروج</a>
+<a href="logout.php" class="btn btn-outline-danger" >تسجيل الخروج</a>
 
 <div class="container py-5">
     <h2 class="text-center mb-4">لوحة التحكم المركزيه</h2>
