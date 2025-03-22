@@ -161,7 +161,7 @@ function showCategory(category) {
 </script>
 
 
-<a href="logout.php">تسجيل الخروج</a>
+<a href="logout.php" class="btn btn-outline-danger" >تسجيل الخروج</a>
 
 <script>
 document.addEventListener("DOMContentLoaded", function() {
