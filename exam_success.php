@@ -17,15 +17,13 @@ if (!isset($_SESSION['user_id'])) {
 
 $user_id = $_SESSION['user_id'];
 
-// التحقق من وجود exam_id في الرابط
 if (!isset($_GET['exam_id']) || empty($_GET['exam_id'])) {
     echo "<p class='text-danger text-center'>⚠️ يجب اختيار امتحان للمتابعة.</p>";
     exit();
 }
 
-$exam_id = intval($_GET['exam_id']); // تأمين المدخلات
+$exam_id = intval($_GET['exam_id']);
 
-// التحقق مما إذا كان المستخدم قد أكمل الامتحان مسبقًا
 $check_query = $conn->prepare("SELECT * FROM user_answers WHERE user_id = ? AND exam_id = ?");
 $check_query->bind_param("ii", $user_id, $exam_id);
 $check_query->execute();
@@ -36,7 +34,6 @@ if ($result->num_rows > 0) {
     exit();
 }
 
-// جلب تفاصيل الامتحان
 $query = $conn->prepare("SELECT * FROM exams WHERE id = ?");
 $query->bind_param("i", $exam_id);
 $query->execute();
@@ -49,9 +46,8 @@ if (!$exam) {
 }
 
 $exam_title = $exam['title'];
-$exam_duration = $exam['duration']; // المدة بالدقائق
+$exam_duration = $exam['duration'];
 
-// التحقق مما إذا كان للمستخدم وقت بدء مسجل مسبقًا
 $start_time_query = $conn->prepare("SELECT start_time FROM user_exam_sessions WHERE user_id = ? AND exam_id = ?");
 $start_time_query->bind_param("ii", $user_id, $exam_id);
 $start_time_query->execute();
@@ -61,7 +57,6 @@ if ($start_time_result->num_rows > 0) {
     $row = $start_time_result->fetch_assoc();
     $start_time = strtotime($row['start_time']);
 } else {
-    // إذا لم يكن هناك وقت بدء، احفظ وقت بدء جديد
     $current_time = date("Y-m-d H:i:s");
     $insert_start_time = $conn->prepare("INSERT INTO user_exam_sessions (user_id, exam_id, start_time) VALUES (?, ?, ?)");
     $insert_start_time->bind_param("iis", $user_id, $exam_id, $current_time);
@@ -69,12 +64,16 @@ if ($start_time_result->num_rows > 0) {
     $start_time = strtotime($current_time);
 }
 
-// حساب الوقت المتبقي
 $current_time = time();
 $elapsed_time = $current_time - $start_time;
 $remaining_time = max(($exam_duration * 60) - $elapsed_time, 0);
 
-// جلب الأسئلة المرتبطة بالامتحان
+// ✅ **التحقق من انتهاء الوقت وعرض رسالة**
+if ($remaining_time <= 0) {
+    echo "<p class='text-danger text-center'>⏳ انتهى الوقت! لا يمكنك الدخول إلى الامتحان.</p>";
+    exit();
+}
+
 $query = $conn->prepare("
     SELECT q.* FROM questions q
     JOIN exam_questions eq ON q.id = eq.question_id
@@ -100,16 +99,20 @@ $questions = $query->get_result();
                 let minutes = Math.floor(timeLeft / 60);
                 let seconds = timeLeft % 60;
                 timerElement.innerHTML = minutes + ":" + (seconds < 10 ? "0" : "") + seconds;
+                
                 if (timeLeft <= 0) {
                     clearInterval(interval);
+                    alert("⏳ انتهى الوقت! سيتم إغلاق الامتحان.");
                     document.getElementById("examForm").submit();
                 }
                 timeLeft--;
             }, 1000);
         }
+
+        window.onload = startTimer;
     </script>
 </head>
-<body onload="startTimer()">
+<body>
     <div class="container mt-5">
         <h2 class="text-center"><?php echo htmlspecialchars($exam_title); ?></h2>
         <p class="text-center text-danger">الوقت المتبقي: <span id="timer"></span></p>
@@ -122,7 +125,6 @@ $questions = $query->get_result();
                     <p><strong><?php echo htmlspecialchars($question['question']); ?></strong></p>
 
                     <?php if ($question['type'] == 'multiple_choice') { 
-                        // جلب الاختيارات من جدول choices
                         $query_choices = $conn->prepare("SELECT * FROM choices WHERE question_id = ?");
                         $query_choices->bind_param("i", $question['id']);
                         $query_choices->execute();
