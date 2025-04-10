@@ -13,7 +13,7 @@ if ($conn->connect_error) {
 $jobs = ['manager', 'captain', 'waiter', 'pass boy' , 'kitchen'];
 
 
-// إلبحث
+//  إلبحث المستخدم
 if (isset($_POST['search_code'])) {
     $search_code = $_POST['search_code'];
     $stmt = $conn->prepare("SELECT * FROM users WHERE code = ?");
@@ -36,8 +36,6 @@ if (isset($_POST['search_code'])) {
     }
     exit;
 }
-
-
 
 // إضافة أو تعديل مستخدم
 if (isset($_POST['add_user']) || isset($_POST['edit_user'])) {
@@ -320,8 +318,17 @@ $files = $conn->query("SELECT * FROM files");
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     
 </head>
-<body class="bg-light">
-<a href="logout.php" class="btn btn-outline-danger" >تسجيل الخروج</a>
+<body class="container bg-light">   
+<nav class="navbar bg-body-tertiary ">
+  <div class="container-fluid">
+    <h2>Garnell</h2>
+    <ul class="nav flex-column">
+  <li class="nav-item">
+  <a href="logout.php" class="btn btn-outline-danger" >تسجيل الخروج</a>
+  </li>
+  </div>
+  
+</nav>
 
 <div class="container py-5">
     <h2 class="text-center mb-4">لوحة التحكم المركزيه</h2>
@@ -357,7 +364,7 @@ $files = $conn->query("SELECT * FROM files");
                         </div>
                     </form>
                 </div>
-                        <div class="card p-4 shadow-sm">
+                        <div class="card p-4 shadow-sm container ">
                             <h4 class="text-center">إدارة المستخدمين</h4>
                             <form method="POST" class="row g-3">
                                 <input type="hidden" id="id" name="id">
@@ -389,13 +396,14 @@ $files = $conn->query("SELECT * FROM files");
                                     <button type="submit" id="submitBtn" name="add_user" class="btn btn-success w-100">إضافة</button>
                                 </div>
                             </form>
-                            <table class="table table-striped table-bordered mt-4">
+
+                            <div class="table-responsive mt-4">
+                            <table class="table table-striped table-bordered table-sm">
                                 <thead class="table-dark">
                                     <tr>
-                                        <th>#</th>
                                         <th>الاسم</th>
                                         <th>الكود</th>
-                                        <th>الدور</th>
+                                        <th class="d-none d-sm-table-cell">الدور</th>
                                         <th>الوظيفة</th>
                                         <th>تحكم</th>
                                     </tr>
@@ -403,10 +411,9 @@ $files = $conn->query("SELECT * FROM files");
                                 <tbody>
                                     <?php while ($user = $users->fetch_assoc()): ?>
                                     <tr>
-                                        <td><?= $user['id'] ?></td>
                                         <td><?= $user['name'] ?></td>
                                         <td><?= $user['code'] ?></td>
-                                        <td><?= $user['role'] ?></td>
+                                        <td class="d-none d-sm-table-cell"><?= $user['role'] ?></td>
                                         <td><?= ucfirst($user['job']) ?></td>
                                         <td>
                                             <button class='btn btn-warning btn-sm' onclick="editUser(<?= $user['id'] ?>, '<?= $user['name'] ?>', '<?= $user['code'] ?>', '<?= $user['password'] ?>', '<?= $user['role'] ?>', '<?= $user['job'] ?>')">✏ تعديل</button>
@@ -416,12 +423,14 @@ $files = $conn->query("SELECT * FROM files");
                                     <?php endwhile; ?>
                                 </tbody>
                             </table>
+                            </div>
                         </div>
                     </div>
 
                     <!-- إدارة الملفات -->
                     <div class="tab-pane fade" id="files" role="tabpanel">
                         <div class="card p-4 shadow-sm">
+                            
                             <h4 class="text-center">إدارة الملفات</h4>
                             <form method="POST" enctype="multipart/form-data" class="row g-3">
                                 <input type="hidden" id="file_id" name="file_id">
@@ -442,23 +451,23 @@ $files = $conn->query("SELECT * FROM files");
                                     <button type="submit" id="file_submit" name="add_file" class="btn btn-success w-100">إضافة</button>
                                 </div>
                             </form>
+
+                            <div class="table-responsive mt-4">
                             <table class="table table-striped table-bordered mt-4">
                                 <thead class="table-dark">
                                     <tr>
-                                        <th>التسلسل</th>
                                         <th>اسم الملف</th>
                                         <th>المسموح له</th>
-                                        <th>الرابط</th>
+                                        <th class="d-none d-sm-table-cell">الرابط</th>
                                         <th>التحكم</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     <?php while ($file = $files->fetch_assoc()): ?>
                                     <tr>
-                                        <td><?= $file['id'] ?></td>
                                         <td><?= $file['file_name'] ?></td>
                                         <td><?= ucfirst($file['allowed_job']) ?></td>
-                                        <td><a class="btn btn-primary btn-sm" href="<?= $file['file_path'] ?>" target="_blank">📂 عرض</a></td>
+                                        <td class="d-none d-sm-table-cell"><a class="btn btn-primary btn-sm" href="<?= $file['file_path'] ?>" target="_blank">📂 عرض</a></td>
                                         <td>
                                             <button class='btn btn-warning btn-sm' onclick="editFile(<?= $file['id'] ?>, '<?= $file['file_name'] ?>', '<?= $file['allowed_job'] ?>')">✏ تعديل</button>
                                             <button class="btn btn-danger btn-sm" onclick="deleteFile(<?= $file['id'] ?>)">❌ حذف</button>
@@ -467,6 +476,7 @@ $files = $conn->query("SELECT * FROM files");
                                     <?php endwhile; ?>
                                 </tbody>
                             </table>
+                            </div>
                         </div>
                     </div>
 
@@ -656,7 +666,7 @@ $files = $conn->query("SELECT * FROM files");
                                 <?php } ?>
                             </select>
                         </div>
-                                            <div class="mb-3">
+                                                    <div class="mb-3">
                                                         <!-- زر فتح النافذة المنبثقة -->
                             <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#questionsModal">
                                 اختر الأسئلة
@@ -707,13 +717,12 @@ $files = $conn->query("SELECT * FROM files");
 
                             <br>
                             <br>
-
                         <button type="submit" name="save_exam" class="btn btn-primary">حفظ الامتحان</button>
                     </form>
                 </div>
 
                 <!-- عرض الامتحانات -->
-                <div class="card p-4 shadow-sm">
+                <div class="table-responsive mt-4">
                     <h4>قائمة الامتحانات</h4>
                     <table class="table table-bordered">
                         <thead>
