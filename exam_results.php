@@ -60,93 +60,106 @@ $result = $stmt->get_result();
 <html lang="ar">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>نتائج الامتحانات - لوحة التحكم</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 </head>
-<body>
-<a href="logout.php">تسجيل الخروج</a>
+<body class="bg-light">   
+<nav class="navbar bg-body-tertiary">
+  <div class="container-fluid">
+    <h2>Garnell</h2>
+    <ul class="nav flex-column">
+      <li class="nav-item">
+        <a href="logout.php" class="btn btn-outline-danger">تسجيل الخروج</a>
+      </li>
+    </ul>
+  </div>
+</nav>
 
 <div class="container mt-4">
     <h2 class="text-center">📊 نتائج الامتحانات</h2>
 
     <!-- نموذج البحث -->
     <form method="GET" class="d-flex justify-content-center mb-4">
-        <input type="text" name="user_code" class="form-control w-25" placeholder="🔍 أدخل كود المستخدم" value="<?= htmlspecialchars($user_code_search) ?>">
+        <input type="text" name="user_code" class="form-control w-75 w-md-25" placeholder="🔍 أدخل كود المستخدم" value="<?= htmlspecialchars($user_code_search) ?>">
         <button type="submit" class="btn btn-primary ms-2">🔍 بحث</button>
         <a href="exam_results.php" class="btn btn-secondary ms-2">🔄 عرض الكل</a>
     </form>
 
+    <div class="text-center mt-4">
+        <a href="admin_dashboard.php" class="btn btn-secondary">🏠 العودة للوحة التحكم</a>
+    </div>
+    <br>
+
     <?php if ($result->num_rows > 0): ?>
-        <table class="table table-bordered">
-            <thead>
-                <tr>
-                    <th>👤 اسم المستخدم</th>
-                    <th>🆔 كود المستخدم</th>
-                    <th>📑 اسم الامتحان</th>
-                    <th>❓ عدد الأسئلة</th>
-                    <th>✅ الإجابات الصحيحة</th>
-                    <th>📊 النسبة المئوية</th>
-                    <th>✍️ الإجابات النصية</th> <!-- زر عرض الإجابات النصية -->
-                </tr>
-            </thead>
-            <tbody>
-                <?php while ($row = $result->fetch_assoc()): 
-                    $score_percentage = ($row['total_questions'] > 0) ? round(($row['correct_answers'] / $row['total_questions']) * 100, 2) : 0;
-                    $modal_id = "textAnswersModal_" . $row['user_id']; // تعريف ID لكل مستخدم للنافذة المنبثقة
-                ?>
+        <div class="table-responsive">
+            <table class="table table-bordered">
+                <thead>
                     <tr>
-                        <td><?= htmlspecialchars($row['user_name']) ?></td>
-                        <td><?= htmlspecialchars($row['user_code']) ?></td>
-                        <td><?= htmlspecialchars($row['exam_title']) ?></td>
-                        <td><?= $row['total_questions'] ?></td>
-                        <td><?= $row['correct_answers'] ?></td>
-                        <td><?= $score_percentage ?>%</td>
-                        <td>
-                            <?php if (!empty($row['text_answers'])): ?>
-                                <!-- زر عرض الإجابات النصية -->
-                                <button class="btn btn-info btn-sm" data-bs-toggle="modal" data-bs-target="#<?= $modal_id ?>">📄 عرض</button>
-                                
-                                <!-- النافذة المنبثقة لعرض الإجابات النصية -->
-                                <div class="modal fade" id="<?= $modal_id ?>" tabindex="-1" aria-labelledby="modalLabel_<?= $row['user_id'] ?>" aria-hidden="true">
-                                    <div class="modal-dialog">
-                                        <div class="modal-content">
-                                            <div class="modal-header">
-                                                <h5 class="modal-title" id="modalLabel_<?= $row['user_id'] ?>">✍️ إجابات <?= htmlspecialchars($row['user_name']) ?></h5>
-                                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="إغلاق"></button>
-                                            </div>
-                                            <div class="modal-body">
-                                                <?php 
-                                                    $text_answers = explode('||', $row['text_answers']);
-                                                    foreach ($text_answers as $answer) {
-                                                        list($question_text, $user_answer) = explode('|', $answer);
-                                                        echo "<p><strong>📝 السؤال:</strong> " . htmlspecialchars($question_text) . "</p>";
-                                                        echo "<p><strong>✅ إجابة المستخدم:</strong> " . htmlspecialchars($user_answer) . "</p>";
-                                                        echo "<hr>";
-                                                    }
-                                                ?>
-                                            </div>
-                                            <div class="modal-footer">
-                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إغلاق</button>
+                        <th>👤 اسم المستخدم</th>
+                        <th>🆔 كود المستخدم</th>
+                        <th>📑 اسم الامتحان</th>
+                        <th class="d-none d-sm-table-cell">❓ عدد الأسئلة</th>
+                        <th class="d-none d-sm-table-cell">✅ الإجابات الصحيحة</th>
+                        <th>📊 النسبة المئوية</th>
+                        <th>✍️ الإجابات النصية</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php while ($row = $result->fetch_assoc()): 
+                        $score_percentage = ($row['total_questions'] > 0) ? round(($row['correct_answers'] / $row['total_questions']) * 100, 2) : 0;
+                        $modal_id = "textAnswersModal_" . $row['user_id']; // تعريف ID لكل مستخدم للنافذة المنبثقة
+                    ?>
+                        <tr>
+                            <td><?= htmlspecialchars($row['user_name']) ?></td>
+                            <td><?= htmlspecialchars($row['user_code']) ?></td>
+                            <td><?= htmlspecialchars($row['exam_title']) ?></td>
+                            <td class="d-none d-sm-table-cell"><?= $row['total_questions'] ?></td>
+                            <td class="d-none d-sm-table-cell"><?= $row['correct_answers'] ?></td>
+                            <td><?= $score_percentage ?>%</td>
+                            <td>
+                                <?php if (!empty($row['text_answers'])): ?>
+                                    <!-- زر عرض الإجابات النصية -->
+                                    <button class="btn btn-info btn-sm" data-bs-toggle="modal" data-bs-target="#<?= $modal_id ?>">📄 عرض</button>
+                                    
+                                    <!-- النافذة المنبثقة لعرض الإجابات النصية -->
+                                    <div class="modal fade" id="<?= $modal_id ?>" tabindex="-1" aria-labelledby="modalLabel_<?= $row['user_id'] ?>" aria-hidden="true">
+                                        <div class="modal-dialog">
+                                            <div class="modal-content">
+                                                <div class="modal-header">
+                                                    <h5 class="modal-title" id="modalLabel_<?= $row['user_id'] ?>">✍️ إجابات <?= htmlspecialchars($row['user_name']) ?></h5>
+                                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="إغلاق"></button>
+                                                </div>
+                                                <div class="modal-body">
+                                                    <?php 
+                                                        $text_answers = explode('||', $row['text_answers']);
+                                                        foreach ($text_answers as $answer) {
+                                                            list($question_text, $user_answer) = explode('|', $answer);
+                                                            echo "<p><strong>📝 السؤال:</strong> " . htmlspecialchars($question_text) . "</p>";
+                                                            echo "<p><strong>✅ إجابة المستخدم:</strong> " . htmlspecialchars($user_answer) . "</p>";
+                                                            echo "<hr>";
+                                                        }
+                                                    ?>
+                                                </div>
+                                                <div class="modal-footer">
+                                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">إغلاق</button>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
-                                </div>
-                            <?php else: ?>
-                                ❌ لا توجد إجابات نصية
-                            <?php endif; ?>
-                        </td>
-                    </tr>
-                <?php endwhile; ?>
-            </tbody>
-        </table>
+                                <?php else: ?>
+                                    ❌ لا توجد إجابات نصية
+                                <?php endif; ?>
+                            </td>
+                        </tr>
+                    <?php endwhile; ?>
+                </tbody>
+            </table>
+        </div>
     <?php else: ?>
         <p class="text-center">❌ لا يوجد أي نتائج.</p>
     <?php endif; ?>
-</div>
-
-<div class="text-center mt-4">
-    <a href="admin_dashboard.php" class="btn btn-secondary">🏠 العودة للوحة التحكم</a>
 </div>
 
 </body>
