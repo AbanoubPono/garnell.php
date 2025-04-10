@@ -83,11 +83,11 @@ $query->bind_param("i", $exam_id);
 $query->execute();
 $questions = $query->get_result();
 ?>
-
 <!DOCTYPE html>
 <html lang="ar">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>أداء الامتحان</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
     <script>
@@ -111,17 +111,58 @@ $questions = $query->get_result();
 
         window.onload = startTimer;
     </script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f8f9fa;
+        }
+
+        .container {
+            max-width: 800px;
+            margin-top: 20px;
+        }
+
+        .question {
+            background-color: #fff;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            margin-bottom: 15px;
+        }
+
+        .form-check {
+            margin-top: 10px;
+        }
+
+        .timer {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: red;
+        }
+
+        .btn-primary {
+            width: 100%;
+            padding: 12px;
+        }
+
+        @media (max-width: 768px) {
+            .btn-primary {
+                font-size: 1.2rem;
+                padding: 15px;
+            }
+        }
+    </style>
 </head>
 <body>
     <div class="container mt-5">
         <h2 class="text-center"><?php echo htmlspecialchars($exam_title); ?></h2>
-        <p class="text-center text-danger">الوقت المتبقي: <span id="timer"></span></p>
+        <p class="text-center timer">الوقت المتبقي: <span id="timer"></span></p>
         <form id="examForm" method="post" action="submit_exam.php">
             <input type="hidden" name="exam_id" value="<?php echo $exam_id; ?>">
             <input type="hidden" name="user_id" value="<?php echo $user_id; ?>">
 
             <?php while ($question = $questions->fetch_assoc()) { ?>
-                <div class="mb-3">
+                <div class="question">
                     <p><strong><?php echo htmlspecialchars($question['question']); ?></strong></p>
 
                     <?php if ($question['type'] == 'multiple_choice') { 
