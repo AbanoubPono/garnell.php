@@ -100,7 +100,7 @@ $conn->close();
 <body>
     <div class="login-container">
         <img src="" alt="Logo" class="d-block mx-auto">
-        <h2 class="text-center mb-4">Garnell</h2>
+        <h2 class="text-center mb-4"></h2>
 
         <h2 class="text-center mb-4">تسجيل الدخول</h2>
         
